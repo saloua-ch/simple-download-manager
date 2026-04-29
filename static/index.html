@@ -468,6 +468,7 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('downloads')">⬇ Downloads</button>
     <button class="tab-btn" onclick="switchTab('history')">🕘 History</button>
+    <button class="tab-btn" onclick="switchTab('settings')">⚙ Settings</button>
   </div>
 
   <!-- Downloads Tab -->
@@ -493,6 +494,10 @@
         <div class="field-sm">
           <label class="field-label">Retries</label>
           <input type="number" id="retriesInput" value="3" min="1" max="10"/>
+        </div>
+        <div class="field-sm">
+          <label class="field-label">BW Limit (KB/s)</label>
+          <input type="number" id="bwInput" value="0" min="0" placeholder="0=∞"/>
         </div>
         <div style="display:flex;align-items:flex-end">
           <button class="btn" onclick="startDownload()">▶ Start</button>
@@ -524,6 +529,37 @@
         <div class="empty-icon">📂</div>
         <h3>No history yet</h3>
         <p>Completed downloads will appear here</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Tab -->
+  <div class="tab-content" id="tab-settings">
+    <div class="card">
+      <div class="card-title">Queue Settings</div>
+      <div class="input-row" style="align-items:flex-end">
+        <div class="field">
+          <label class="field-label">Max Concurrent Downloads</label>
+          <input type="number" id="maxConcurrentInput" value="3" min="1" max="10"/>
+          <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--muted);margin-top:0.4rem">
+            Downloads beyond this limit are queued automatically
+          </div>
+        </div>
+        <button class="btn" onclick="saveSettings()" style="margin-bottom:0">💾 Save</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:0.75rem">
+      <div class="card-title">Resume After Restart</div>
+      <div style="font-family:var(--font-mono);font-size:0.78rem;color:var(--muted);line-height:1.8">
+        All active and paused downloads are saved to <span style="color:var(--accent)">history/queue.json</span>.<br>
+        On server restart they are restored as <span style="color:var(--warn)">paused</span> — click ▶ Resume to continue.
+      </div>
+    </div>
+    <div class="card" style="margin-top:0.75rem">
+      <div class="card-title">Bandwidth Limiting</div>
+      <div style="font-family:var(--font-mono);font-size:0.78rem;color:var(--muted);line-height:1.8">
+        Set <span style="color:var(--accent)">BW Limit (KB/s)</span> per download in the form above.<br>
+        <span style="color:var(--accent)">0</span> = unlimited &nbsp;|&nbsp; e.g. <span style="color:var(--accent)">500</span> = capped at 500 KB/s per download.
       </div>
     </div>
   </div>
@@ -575,6 +611,22 @@
     return Math.floor(secs/3600) + 'h ' + Math.floor((secs%3600)/60) + 'm';
   }
 
+  // ── Settings ───────────────────────────────
+  async function saveSettings() {
+    const val = parseInt(document.getElementById('maxConcurrentInput').value) || 3;
+    await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({max_concurrent: val}) });
+    showToast('Settings saved ✓');
+    await poll();
+  }
+
+  async function loadSettings() {
+    try {
+      const res = await fetch('/api/settings');
+      const data = await res.json();
+      document.getElementById('maxConcurrentInput').value = data.max_concurrent;
+    } catch(e) {}
+  }
+
   // ── Start download ─────────────────────────
   async function startDownload() {
     const url = document.getElementById('urlInput').value.trim();
@@ -584,6 +636,7 @@
       filename: document.getElementById('nameInput').value.trim() || null,
       threads: parseInt(document.getElementById('threadsInput').value) || 4,
       retries: parseInt(document.getElementById('retriesInput').value) || 3,
+      bandwidth_limit: (parseInt(document.getElementById('bwInput').value) || 0) * 1024,
     };
     try {
       const res = await fetch('/api/download', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
@@ -621,7 +674,7 @@
       downloads = {};
       list.forEach(d => downloads[d.id] = d);
       renderDownloads();
-      const active = list.filter(d => d.status === 'downloading' || d.status === 'pending' || d.status === 'paused').length;
+      const active = list.filter(d => ['downloading','pending','paused','queued'].includes(d.status)).length;
       document.getElementById('activeCount').textContent = active + ' ACTIVE';
       if (active === 0 && pollInterval) {
         clearInterval(pollInterval);
@@ -647,6 +700,8 @@
       const isErr = d.status === 'error';
       const isCancelled = d.status === 'cancelled';
 
+      const isQueued = d.status === 'queued';
+
       const barClass = isDone ? 'completed' : isErr ? 'error' : '';
 
       // Thread pills
@@ -654,10 +709,19 @@
         `<div class="thread-pill ${isActive ? 'active' : ''}"></div>`
       ).join('');
 
+      // Queue badge
+      const queueBadge = isQueued ? `<span style="font-family:var(--font-mono);font-size:0.62rem;color:var(--accent2);margin-left:0.5rem">#${d.queue_pos} in queue</span>` : '';
+
+      // BW badge
+      const bwBadge = d.bandwidth_limit > 0
+        ? `<span style="font-family:var(--font-mono);font-size:0.62rem;color:var(--warn);margin-left:0.5rem">⚡ ${Math.round(d.bandwidth_limit/1024)} KB/s cap</span>`
+        : '';
+
       // Action buttons
       let actions = '';
       if (isActive) actions += `<button class="btn-sm btn-pause" onclick="ctrl('${d.id}','pause')">⏸ Pause</button>`;
       if (isPaused) actions += `<button class="btn-sm btn-resume" onclick="ctrl('${d.id}','resume')">▶ Resume</button>`;
+      if (isQueued) actions += `<button class="btn-sm btn-cancel" onclick="ctrl('${d.id}','cancel')">✕ Cancel</button>`;
       if (isActive || isPaused) actions += `<button class="btn-sm btn-cancel" onclick="ctrl('${d.id}','cancel')">✕ Cancel</button>`;
       if (isDone || isErr || isCancelled) actions += `<button class="btn-sm btn-delete" onclick="ctrl('${d.id}','delete')">🗑 Remove</button>`;
 
@@ -666,7 +730,7 @@
           <div class="item-top">
             <div class="file-icon">${fileIcon(d.filename)}</div>
             <div class="item-info">
-              <div class="item-name">${escHtml(d.filename)}</div>
+              <div class="item-name">${escHtml(d.filename)}${queueBadge}${bwBadge}</div>
               <div class="item-url">${escHtml(d.url)}</div>
             </div>
             <span class="status-badge status-${d.status}">${d.status}</span>
@@ -754,6 +818,7 @@
 
   // Initial load
   poll();
+  loadSettings();
 </script>
 </body>
 </html>
