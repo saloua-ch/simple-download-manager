@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SDM — Simple Download Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #252535;
+    --accent: #00e5ff;
+    --accent2: #7c3aed;
+    --accent3: #f59e0b;
+    --text: #e8e8f0;
+    --muted: #6b6b8a;
+    --danger: #ef4444;
+    --success: #22c55e;
+    --warn: #f59e0b;
+    --font-head: 'Syne', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-head);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Glow orbs */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .orb1 { width: 500px; height: 500px; background: rgba(0,229,255,0.06); top: -100px; left: -100px; }
+  .orb2 { width: 400px; height: 400px; background: rgba(124,58,237,0.06); bottom: -50px; right: -50px; }
+
+  /* Layout */
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+  }
+
+  .logo-text h1 {
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .logo-text span {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .header-badge {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--accent);
+    border: 1px solid rgba(0,229,255,0.3);
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(0,229,255,0.05);
+    letter-spacing: 0.1em;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.3rem;
+  }
+
+  .tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-family: var(--font-head);
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+  }
+  .tab-btn.active {
+    background: var(--surface2);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+
+  /* Add Download Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .card-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  input[type=text], input[type=number] {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    padding: 0.65rem 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+  input[type=text]:focus, input[type=number]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,229,255,0.08);
+  }
+
+  label.field-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.35rem;
+  }
+
+  .field { flex: 1; }
+  .field-sm { width: 110px; flex-shrink: 0; }
+
+  .btn {
+    background: linear-gradient(135deg, var(--accent), #00b8d4);
+    border: none;
+    border-radius: 10px;
+    color: #0a0a0f;
+    font-family: var(--font-head);
+    font-size: 0.85rem;
+    font-weight: 800;
+    padding: 0.65rem 1.4rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,229,255,0.3); }
+  .btn:active { transform: translateY(0); }
+
+  .btn-sm {
+    font-size: 0.72rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 7px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-head);
+    font-weight: 700;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+  }
+  .btn-pause { background: rgba(245,158,11,0.15); color: var(--warn); }
+  .btn-pause:hover { background: rgba(245,158,11,0.25); }
+  .btn-resume { background: rgba(34,197,94,0.15); color: var(--success); }
+  .btn-resume:hover { background: rgba(34,197,94,0.25); }
+  .btn-cancel { background: rgba(239,68,68,0.15); color: var(--danger); }
+  .btn-cancel:hover { background: rgba(239,68,68,0.25); }
+  .btn-delete { background: rgba(107,107,138,0.15); color: var(--muted); }
+  .btn-delete:hover { background: rgba(107,107,138,0.3); color: var(--text); }
+  .btn-danger { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); font-size: 0.75rem; padding: 0.4rem 0.9rem; }
+
+  /* Download item */
+  .download-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    animation: slideIn 0.3s ease;
+    transition: border-color 0.3s;
+  }
+  .download-item:hover { border-color: rgba(0,229,255,0.2); }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .item-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .file-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--surface2);
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+  }
+
+  .item-info { flex: 1; min-width: 0; }
+  .item-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 0.2rem;
+  }
+  .item-url {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .status-badge {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .status-downloading { background: rgba(0,229,255,0.1); color: var(--accent); border: 1px solid rgba(0,229,255,0.2); }
+  .status-paused { background: rgba(245,158,11,0.1); color: var(--warn); border: 1px solid rgba(245,158,11,0.2); }
+  .status-completed { background: rgba(34,197,94,0.1); color: var(--success); border: 1px solid rgba(34,197,94,0.2); }
+  .status-error { background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid rgba(239,68,68,0.2); }
+  .status-cancelled { background: rgba(107,107,138,0.1); color: var(--muted); border: 1px solid var(--border); }
+  .status-pending { background: rgba(124,58,237,0.1); color: #a78bfa; border: 1px solid rgba(124,58,237,0.2); }
+
+  /* Progress bar */
+  .progress-wrap {
+    margin-bottom: 0.6rem;
+  }
+  .progress-bar-bg {
+    background: var(--surface2);
+    border-radius: 999px;
+    height: 5px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    transition: width 0.5s ease;
+    position: relative;
+  }
+  .progress-bar-fill.completed { background: linear-gradient(90deg, #16a34a, var(--success)); }
+  .progress-bar-fill.error { background: var(--danger); }
+
+  .progress-shimmer {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
+    animation: shimmer 1.5s infinite;
+  }
+  @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+  /* Stats row */
+  .stats-row {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 0.7rem;
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+  .stat-val {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .stat-label {
+    font-size: 0.6rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* Actions */
+  .item-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--muted);
+  }
+  .empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.4; }
+  .empty-state h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text); opacity: 0.5; }
+  .empty-state p { font-size: 0.8rem; font-family: var(--font-mono); }
+
+  /* History */
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1.1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 0.5rem;
+    animation: slideIn 0.2s ease;
+  }
+  .history-info { flex: 1; min-width: 0; }
+  .history-name { font-size: 0.87rem; font-weight: 700; margin-bottom: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-meta { font-family: var(--font-mono); font-size: 0.63rem; color: var(--muted); }
+  .history-size { font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent); font-weight: 700; margin-left: auto; white-space: nowrap; }
+
+  /* History header */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .section-header h2 {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* Error toast */
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: var(--danger);
+    color: white;
+    padding: 0.75rem 1.2rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    z-index: 100;
+    animation: toastIn 0.3s ease;
+    max-width: 320px;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .thread-pills {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-top: 0.3rem;
+  }
+  .thread-pill {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.3;
+    transition: opacity 0.3s;
+  }
+  .thread-pill.active { opacity: 1; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+</style>
+</head>
+<body>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div class="container">
+  <!-- Header -->
+  <header>
+    <div class="logo">⬇</div>
+    <div class="logo-text">
+      <h1>SDM</h1>
+      <span>Simple Download Manager</span>
+    </div>
+    <div class="header-badge" id="activeCount">0 ACTIVE</div>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('downloads')">⬇ Downloads</button>
+    <button class="tab-btn" onclick="switchTab('history')">🕘 History</button>
+  </div>
+
+  <!-- Downloads Tab -->
+  <div class="tab-content active" id="tab-downloads">
+    <!-- Add form -->
+    <div class="card">
+      <div class="card-title">New Download</div>
+      <div>
+        <label class="field-label">File URL</label>
+        <div class="input-row" style="margin-bottom:0.75rem">
+          <input type="text" id="urlInput" placeholder="https://example.com/file.zip" style="flex:1"/>
+        </div>
+      </div>
+      <div class="input-row">
+        <div class="field">
+          <label class="field-label">Filename (optional)</label>
+          <input type="text" id="nameInput" placeholder="auto-detect"/>
+        </div>
+        <div class="field-sm">
+          <label class="field-label">Threads</label>
+          <input type="number" id="threadsInput" value="4" min="1" max="16"/>
+        </div>
+        <div class="field-sm">
+          <label class="field-label">Retries</label>
+          <input type="number" id="retriesInput" value="3" min="1" max="10"/>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn" onclick="startDownload()">▶ Start</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active downloads list -->
+    <div class="section-header">
+      <h2>Active Downloads</h2>
+    </div>
+    <div id="downloadList">
+      <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <h3>No downloads yet</h3>
+        <p>Paste a URL above to get started</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Tab -->
+  <div class="tab-content" id="tab-history">
+    <div class="section-header">
+      <h2>Download History</h2>
+      <button class="btn btn-sm btn-danger" onclick="clearHistory()">🗑 Clear All</button>
+    </div>
+    <div id="historyList">
+      <div class="empty-state">
+        <div class="empty-icon">📂</div>
+        <h3>No history yet</h3>
+        <p>Completed downloads will appear here</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let downloads = {};
+  let pollInterval = null;
+
+  // ── Tab switching ──────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    event.target.classList.add('active');
+    if (name === 'history') loadHistory();
+  }
+
+  // ── File icon ──────────────────────────────
+  function fileIcon(name) {
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    const map = { zip:'🗜', gz:'🗜', rar:'🗜', '7z':'🗜', tar:'🗜',
+                  mp4:'🎬', mkv:'🎬', avi:'🎬', mov:'🎬',
+                  mp3:'🎵', wav:'🎵', flac:'🎵',
+                  jpg:'🖼', jpeg:'🖼', png:'🖼', gif:'🖼',
+                  pdf:'📄', doc:'📝', docx:'📝', txt:'📝',
+                  exe:'⚙', dmg:'⚙', deb:'⚙', apk:'📱' };
+    return map[ext] || '📦';
+  }
+
+  // ── Format helpers ─────────────────────────
+  function fmtSize(bytes) {
+    if (!bytes) return '—';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+    if (bytes < 1073741824) return (bytes/1048576).toFixed(1) + ' MB';
+    return (bytes/1073741824).toFixed(2) + ' GB';
+  }
+
+  function fmtSpeed(bps) {
+    if (!bps) return '—';
+    return fmtSize(bps) + '/s';
+  }
+
+  function fmtEta(secs) {
+    if (!secs || !isFinite(secs)) return '—';
+    if (secs < 60) return secs + 's';
+    if (secs < 3600) return Math.floor(secs/60) + 'm ' + (secs%60) + 's';
+    return Math.floor(secs/3600) + 'h ' + Math.floor((secs%3600)/60) + 'm';
+  }
+
+  // ── Start download ─────────────────────────
+  async function startDownload() {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) { showToast('Please enter a URL'); return; }
+    const body = {
+      url,
+      filename: document.getElementById('nameInput').value.trim() || null,
+      threads: parseInt(document.getElementById('threadsInput').value) || 4,
+      retries: parseInt(document.getElementById('retriesInput').value) || 3,
+    };
+    try {
+      const res = await fetch('/api/download', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || 'Error'); return; }
+      downloads[data.id] = data;
+      document.getElementById('urlInput').value = '';
+      document.getElementById('nameInput').value = '';
+      renderDownloads();
+      startPolling();
+    } catch(e) { showToast('Network error: ' + e.message); }
+  }
+
+  // ── Controls ───────────────────────────────
+  async function ctrl(id, action) {
+    try {
+      const method = action === 'delete' ? 'DELETE' : 'POST';
+      const url = action === 'delete' ? `/api/downloads/${id}` : `/api/downloads/${id}/${action}`;
+      await fetch(url, { method });
+      if (action === 'delete' || action === 'cancel') delete downloads[id];
+      await poll();
+    } catch(e) { showToast(e.message); }
+  }
+
+  // ── Polling ────────────────────────────────
+  function startPolling() {
+    if (pollInterval) return;
+    pollInterval = setInterval(poll, 800);
+  }
+
+  async function poll() {
+    try {
+      const res = await fetch('/api/downloads');
+      const list = await res.json();
+      downloads = {};
+      list.forEach(d => downloads[d.id] = d);
+      renderDownloads();
+      const active = list.filter(d => d.status === 'downloading' || d.status === 'pending' || d.status === 'paused').length;
+      document.getElementById('activeCount').textContent = active + ' ACTIVE';
+      if (active === 0 && pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    } catch(e) {}
+  }
+
+  // ── Render downloads ───────────────────────
+  function renderDownloads() {
+    const list = Object.values(downloads);
+    const container = document.getElementById('downloadList');
+    if (list.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><h3>No downloads yet</h3><p>Paste a URL above to get started</p></div>`;
+      return;
+    }
+
+    container.innerHTML = list.map(d => {
+      const pct = d.percent || 0;
+      const isActive = d.status === 'downloading';
+      const isPaused = d.status === 'paused';
+      const isDone = d.status === 'completed';
+      const isErr = d.status === 'error';
+      const isCancelled = d.status === 'cancelled';
+
+      const barClass = isDone ? 'completed' : isErr ? 'error' : '';
+
+      // Thread pills
+      const pills = Array.from({length: d.num_threads}, (_, i) =>
+        `<div class="thread-pill ${isActive ? 'active' : ''}"></div>`
+      ).join('');
+
+      // Action buttons
+      let actions = '';
+      if (isActive) actions += `<button class="btn-sm btn-pause" onclick="ctrl('${d.id}','pause')">⏸ Pause</button>`;
+      if (isPaused) actions += `<button class="btn-sm btn-resume" onclick="ctrl('${d.id}','resume')">▶ Resume</button>`;
+      if (isActive || isPaused) actions += `<button class="btn-sm btn-cancel" onclick="ctrl('${d.id}','cancel')">✕ Cancel</button>`;
+      if (isDone || isErr || isCancelled) actions += `<button class="btn-sm btn-delete" onclick="ctrl('${d.id}','delete')">🗑 Remove</button>`;
+
+      return `
+        <div class="download-item" id="item-${d.id}">
+          <div class="item-top">
+            <div class="file-icon">${fileIcon(d.filename)}</div>
+            <div class="item-info">
+              <div class="item-name">${escHtml(d.filename)}</div>
+              <div class="item-url">${escHtml(d.url)}</div>
+            </div>
+            <span class="status-badge status-${d.status}">${d.status}</span>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill ${barClass}" style="width:${pct}%">
+                ${isActive ? '<div class="progress-shimmer"></div>' : ''}
+              </div>
+            </div>
+          </div>
+          <div class="stats-row">
+            <div class="stat">
+              <div class="stat-val">${pct}%</div>
+              <div class="stat-label">Progress</div>
+            </div>
+            <div class="stat">
+              <div class="stat-val">${fmtSize(d.downloaded)} / ${fmtSize(d.total_size)}</div>
+              <div class="stat-label">Downloaded</div>
+            </div>
+            <div class="stat">
+              <div class="stat-val">${fmtSpeed(d.speed)}</div>
+              <div class="stat-label">Speed</div>
+            </div>
+            <div class="stat">
+              <div class="stat-val">${fmtEta(d.eta)}</div>
+              <div class="stat-label">ETA</div>
+            </div>
+            <div class="stat" style="margin-left:auto">
+              <div class="thread-pills">${pills}</div>
+              <div class="stat-label">${d.num_threads} threads</div>
+            </div>
+          </div>
+          ${d.error ? `<div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--danger);margin-bottom:0.5rem">⚠ ${escHtml(d.error)}</div>` : ''}
+          <div class="item-actions">${actions}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── History ────────────────────────────────
+  async function loadHistory() {
+    try {
+      const res = await fetch('/api/history');
+      const list = await res.json();
+      const container = document.getElementById('historyList');
+      if (list.length === 0) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-icon">📂</div><h3>No history yet</h3><p>Completed downloads will appear here</p></div>`;
+        return;
+      }
+      container.innerHTML = [...list].reverse().map(h => `
+        <div class="history-item">
+          <div class="file-icon">${fileIcon(h.filename)}</div>
+          <div class="history-info">
+            <div class="history-name">${escHtml(h.filename)}</div>
+            <div class="history-meta">${h.date} · ${h.threads} threads · <span style="color:var(--muted)">${escHtml(h.url.slice(0,60))}${h.url.length>60?'…':''}</span></div>
+          </div>
+          <div class="history-size">${fmtSize(h.size)}</div>
+        </div>`).join('');
+    } catch(e) {}
+  }
+
+  async function clearHistory() {
+    if (!confirm('Clear all download history?')) return;
+    await fetch('/api/history', {method:'DELETE'});
+    loadHistory();
+  }
+
+  // ── Toast ──────────────────────────────────
+  function showToast(msg) {
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Enter key ──────────────────────────────
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.activeElement.id === 'urlInput') startDownload();
+  });
+
+  // Initial load
+  poll();
+</script>
+</body>
+</html>
